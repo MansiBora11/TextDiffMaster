@@ -10,8 +10,8 @@ import com.opencsv.CSVWriter;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class FileDifferenceService {
 
@@ -139,46 +139,61 @@ public class FileDifferenceService {
                     .append("<thead><tr><th>File 1 (Deleted Content)</th><th>File 2 (Added Content)</th></tr></thead>")
                     .append("<tbody>");
 
-            // Two-pointer approach for line-by-line comparison
             int i = 0, j = 0;
             while (i < lines1.size() || j < lines2.size()) {
                 String line1 = i < lines1.size() ? lines1.get(i) : "";
                 String line2 = j < lines2.size() ? lines2.get(j) : "";
 
-                String highlightedLine1 = "";
-                String highlightedLine2 = "";
-
+                // Handle empty cases first
                 if (line1.isEmpty() && !line2.isEmpty()) {
-                    // Line exists only in File 2
-                    highlightedLine1 = "&nbsp;"; // Leave File 1 column empty
-                    highlightedLine2 = "<span class='added'>" + escapeHtml(line2) + "</span>";
+                    appendRow(htmlOutput, "&nbsp;",
+                            "<span class='added'>" + escapeHtml(line2) + "</span>");
                     j++;
-                } else if (!line1.isEmpty() && line2.isEmpty()) {
-                    // Line exists only in File 1
-                    highlightedLine1 = "<span class='deleted'>" + escapeHtml(line1) + "</span>";
-                    highlightedLine2 = "&nbsp;"; // Leave File 2 column empty
+                    continue;
+                }
+                if (!line1.isEmpty() && line2.isEmpty()) {
+                    appendRow(htmlOutput,
+                            "<span class='deleted'>" + escapeHtml(line1) + "</span>",
+                            "&nbsp;");
                     i++;
-                } else if (!line1.equals(line2)) {
-                    // Lines exist in both files but differ, highlight differences
-                    LinkedList<DiffMatchPatch.Diff> diffs = dmp.diffMain(line1, line2);
-                    dmp.diffCleanupSemantic(diffs);
+                    continue;
+                }
 
-                    highlightedLine1 = highlightDifferences(diffs, DiffMatchPatch.Operation.DELETE);
-                    highlightedLine2 = highlightDifferences(diffs, DiffMatchPatch.Operation.INSERT);
-                    i++;
-                    j++;
-                } else {
-                    // Skip identical lines
+                // Skip identical lines
+                if (line1.equals(line2)) {
                     i++;
                     j++;
                     continue;
                 }
 
-                // Append the rows with highlighted differences or exclusive lines
-                htmlOutput.append("<tr>")
-                        .append("<td>").append(highlightedLine1).append("</td>")
-                        .append("<td>").append(highlightedLine2).append("</td>")
-                        .append("</tr>");
+                // Check if this is a line that should be shown alone
+                if (line1.contains("exists only in file1")) {
+                    appendRow(htmlOutput,
+                            "<span class='deleted'>" + escapeHtml(line1) + "</span>",
+                            "&nbsp;");
+                    i++;
+                    continue;
+                }
+
+                // Check if lines are similar enough to compare
+                boolean areSimilar = isSimilarEnough(line1, line2);
+
+                if (areSimilar) {
+                    // Compare and highlight differences
+                    LinkedList<DiffMatchPatch.Diff> diffs = dmp.diffMain(line1, line2);
+                    dmp.diffCleanupSemantic(diffs);
+                    appendRow(htmlOutput,
+                            highlightDifferences(diffs, DiffMatchPatch.Operation.DELETE),
+                            highlightDifferences(diffs, DiffMatchPatch.Operation.INSERT));
+                    i++;
+                    j++;
+                } else {
+                    // Lines are too different - show with empty cells
+                    appendRow(htmlOutput,
+                            "<span class='deleted'>" + escapeHtml(line1) + "</span>",
+                            "&nbsp;");
+                    i++;
+                }
             }
 
             htmlOutput.append("</tbody>")
@@ -192,6 +207,25 @@ public class FileDifferenceService {
             }
 
             System.out.println("Differences have been saved to 'highlighted_diff.html'");
+        }
+
+        private static boolean isSimilarEnough(String str1, String str2) {
+            // Check if the strings share enough common words to be considered similar
+            Set<String> words1 = new HashSet<>(Arrays.asList(str1.toLowerCase().split("\\s+")));
+            Set<String> words2 = new HashSet<>(Arrays.asList(str2.toLowerCase().split("\\s+")));
+
+            Set<String> intersection = new HashSet<>(words1);
+            intersection.retainAll(words2);
+
+            // If they share more than 60% of their words, consider them similar
+            return intersection.size() >= Math.min(words1.size(), words2.size()) * 0.6;
+        }
+
+        private static void appendRow(StringBuilder htmlOutput, String col1, String col2) {
+            htmlOutput.append("<tr>")
+                    .append("<td>").append(col1).append("</td>")
+                    .append("<td>").append(col2).append("</td>")
+                    .append("</tr>");
         }
 
         private static String highlightDifferences(LinkedList<DiffMatchPatch.Diff> diffs, DiffMatchPatch.Operation targetOperation) {
