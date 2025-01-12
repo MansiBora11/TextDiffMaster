@@ -31,21 +31,9 @@ public class FileDifferenceService {
             }
         }
 
-        private static void compareTextFiles(String filePath1, String filePath2) throws IOException {
-            String text1 = new String(Files.readAllBytes(Paths.get(filePath1)));
-            String text2 = new String(Files.readAllBytes(Paths.get(filePath2)));
 
-            DiffMatchPatch dmp = new DiffMatchPatch();
-            LinkedList<DiffMatchPatch.Diff> diffs = dmp.diffMain(text1, text2);
-            dmp.diffCleanupSemantic(diffs);
 
-            String highlightedText = highlightDifferences(diffs);
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter("highlighted_diff.txt"))) {
-                writer.write(highlightedText);
-            }
 
-            System.out.println("Differences have been saved to 'highlighted_diff.txt'");
-        }
 
         private static void compareCsvFiles(String filePath1, String filePath2) throws IOException {
             try (CSVReader reader1 = new CSVReader(new FileReader(filePath1));
@@ -126,24 +114,103 @@ public class FileDifferenceService {
             }
         }
 
-        private static String highlightDifferences(LinkedList<DiffMatchPatch.Diff> diffs) {
-            StringBuilder html = new StringBuilder();
+        private static void compareTextFiles(String filePath1, String filePath2) throws IOException {
+            List<String> lines1 = Files.readAllLines(Paths.get(filePath1));
+            List<String> lines2 = Files.readAllLines(Paths.get(filePath2));
+
+            DiffMatchPatch dmp = new DiffMatchPatch();
+            StringBuilder htmlOutput = new StringBuilder();
+
+            htmlOutput.append("<!DOCTYPE html>")
+                    .append("<html>")
+                    .append("<head>")
+                    .append("<style>")
+                    .append("body { font-family: Arial, sans-serif; }")
+                    .append("table { border-collapse: collapse; width: 100%; margin-top: 20px; }")
+                    .append("th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }")
+                    .append("th { background-color: #f2f2f2; }")
+                    .append(".added { background-color: #b2f0b2; }") // Green for additions
+                    .append(".deleted { background-color: #f0b2b2; }") // Red for deletions
+                    .append("</style>")
+                    .append("</head>")
+                    .append("<body>")
+                    .append("<h2>File Comparison</h2>")
+                    .append("<table>")
+                    .append("<thead><tr><th>File 1 (Deleted Content)</th><th>File 2 (Added Content)</th></tr></thead>")
+                    .append("<tbody>");
+
+            // Two-pointer approach for line-by-line comparison
+            int i = 0, j = 0;
+            while (i < lines1.size() || j < lines2.size()) {
+                String line1 = i < lines1.size() ? lines1.get(i) : "";
+                String line2 = j < lines2.size() ? lines2.get(j) : "";
+
+                String highlightedLine1 = "";
+                String highlightedLine2 = "";
+
+                if (line1.isEmpty() && !line2.isEmpty()) {
+                    // Line exists only in File 2
+                    highlightedLine1 = "&nbsp;"; // Leave File 1 column empty
+                    highlightedLine2 = "<span class='added'>" + escapeHtml(line2) + "</span>";
+                    j++;
+                } else if (!line1.isEmpty() && line2.isEmpty()) {
+                    // Line exists only in File 1
+                    highlightedLine1 = "<span class='deleted'>" + escapeHtml(line1) + "</span>";
+                    highlightedLine2 = "&nbsp;"; // Leave File 2 column empty
+                    i++;
+                } else if (!line1.equals(line2)) {
+                    // Lines exist in both files but differ, highlight differences
+                    LinkedList<DiffMatchPatch.Diff> diffs = dmp.diffMain(line1, line2);
+                    dmp.diffCleanupSemantic(diffs);
+
+                    highlightedLine1 = highlightDifferences(diffs, DiffMatchPatch.Operation.DELETE);
+                    highlightedLine2 = highlightDifferences(diffs, DiffMatchPatch.Operation.INSERT);
+                    i++;
+                    j++;
+                } else {
+                    // Skip identical lines
+                    i++;
+                    j++;
+                    continue;
+                }
+
+                // Append the rows with highlighted differences or exclusive lines
+                htmlOutput.append("<tr>")
+                        .append("<td>").append(highlightedLine1).append("</td>")
+                        .append("<td>").append(highlightedLine2).append("</td>")
+                        .append("</tr>");
+            }
+
+            htmlOutput.append("</tbody>")
+                    .append("</table>")
+                    .append("</body>")
+                    .append("</html>");
+
+            // Write the output to an HTML file
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter("highlighted_diff.html"))) {
+                writer.write(htmlOutput.toString());
+            }
+
+            System.out.println("Differences have been saved to 'highlighted_diff.html'");
+        }
+
+        private static String highlightDifferences(LinkedList<DiffMatchPatch.Diff> diffs, DiffMatchPatch.Operation targetOperation) {
+            StringBuilder result = new StringBuilder();
 
             for (DiffMatchPatch.Diff diff : diffs) {
-                switch (diff.operation) {
-                    case INSERT:
-                        html.append("<span style='background-color: #b2f0b2;'>").append(diff.text).append("</span>");
-                        break;
-                    case DELETE:
-                        html.append("<span style='background-color: #f0b2b2; text-decoration: line-through;'>").append(diff.text).append("</span>");
-                        break;
-                    case EQUAL:
-                        html.append(diff.text);
-                        break;
+                if (diff.operation == targetOperation) {
+                    String cssClass = targetOperation == DiffMatchPatch.Operation.DELETE ? "deleted" : "added";
+                    result.append("<span class='").append(cssClass).append("'>").append(escapeHtml(diff.text)).append("</span>");
+                } else if (diff.operation == DiffMatchPatch.Operation.EQUAL) {
+                    result.append(escapeHtml(diff.text));
                 }
             }
 
-            return html.toString();
+            return result.toString();
+        }
+
+        private static String escapeHtml(String text) {
+            return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
         }
     }
 }
