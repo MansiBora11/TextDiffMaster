@@ -144,7 +144,7 @@ public class FileDifferenceService {
                 String line1 = i < lines1.size() ? lines1.get(i) : "";
                 String line2 = j < lines2.size() ? lines2.get(j) : "";
 
-                // Handle empty cases first
+                // Handle empty cases
                 if (line1.isEmpty() && !line2.isEmpty()) {
                     appendRow(htmlOutput, "&nbsp;",
                             "<span class='added'>" + escapeHtml(line2) + "</span>");
@@ -159,27 +159,26 @@ public class FileDifferenceService {
                     continue;
                 }
 
-                // Skip identical lines
-                if (line1.equals(line2)) {
-                    i++;
+                // Check if current line2 has any similar match in file1
+                boolean line2HasMatch = false;
+                for (int k = i; k < lines1.size(); k++) {
+                    if (isSimilarEnough(line2, lines1.get(k))) {
+                        line2HasMatch = true;
+                        break;
+                    }
+                }
+
+                // If line2 has no match, print it first with empty cell in file1
+                if (!line2HasMatch) {
+                    appendRow(htmlOutput,
+                            "&nbsp;",
+                            "<span class='added'>" + escapeHtml(line2) + "</span>");
                     j++;
                     continue;
                 }
 
-                // Check if this is a line that should be shown alone
-                if (line1.contains("exists only in file1")) {
-                    appendRow(htmlOutput,
-                            "<span class='deleted'>" + escapeHtml(line1) + "</span>",
-                            "&nbsp;");
-                    i++;
-                    continue;
-                }
-
-                // Check if lines are similar enough to compare
-                boolean areSimilar = isSimilarEnough(line1, line2);
-
-                if (areSimilar) {
-                    // Compare and highlight differences
+                // Now handle normal comparison of similar lines
+                if (isSimilarEnough(line1, line2)) {
                     LinkedList<DiffMatchPatch.Diff> diffs = dmp.diffMain(line1, line2);
                     dmp.diffCleanupSemantic(diffs);
                     appendRow(htmlOutput,
@@ -188,7 +187,7 @@ public class FileDifferenceService {
                     i++;
                     j++;
                 } else {
-                    // Lines are too different - show with empty cells
+                    // If current lines aren't similar enough, move forward in file1
                     appendRow(htmlOutput,
                             "<span class='deleted'>" + escapeHtml(line1) + "</span>",
                             "&nbsp;");
