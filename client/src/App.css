@@ -4,8 +4,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh; /* Full viewport height */
-  background-color: #b7dae4; /* Optional background color */
+  height: 100vh; 
+  background-color: #e4ebed; 
 }
 
 .container {
@@ -13,9 +13,9 @@ body {
   width: 100%;
   padding: 20px;
   text-align: center;
-  background-color: #ffffff; /* Optional background for the container */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Optional shadow for aesthetics */
-  border-radius: 8px; /* Optional rounded corners */
+  background-color: #ffffff; 
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); 
+  border-radius: 8px; 
 }
 
 select, button {
@@ -33,7 +33,7 @@ button {
 
 label {
   font-size: 16px;
-  margin-right: 10px; /* Adds space between "Choose an option:" and dropdown */
+  margin-right: 10px; 
 }
 
 .upload-section {
