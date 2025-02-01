@@ -78,6 +78,7 @@ function App() {
           onChange={handleOptionChange}
           disabled={loading}
         >
+          <option value="">--Select an option--</option>
           <option value="file">File</option>
           <option value="folder">Folder</option>
         </select>
