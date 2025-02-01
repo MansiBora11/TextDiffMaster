@@ -32,15 +32,30 @@ function App() {
 
   const handleSubmit = async () => {
     try {
-      if (!files.file1 || !files.file2) {
+      if (uploadType === 'file' && (!files.file1 || !files.file2)) {
         alert('Please upload both files.');
+        return;
+      }
+      if (uploadType === 'folder' && (files.folder1.length === 0 || files.folder2.length === 0)) {
+        alert('Please select both folders.');
         return;
       }
 
       setLoading(true);
       const formData = new FormData();
-      formData.append('file1', files.file1);
-      formData.append('file2', files.file2);
+      
+      if (uploadType === 'file') {
+        formData.append('file1', files.file1);
+        formData.append('file2', files.file2);
+      } else {
+        // Handle folder comparison logic here
+        files.folder1.forEach((file) => {
+          formData.append('folder1', file);
+        });
+        files.folder2.forEach((file) => {
+          formData.append('folder2', file);
+        });
+      }
 
       await fileService.compareFiles(formData);
     } catch (error) {
@@ -69,7 +84,7 @@ function App() {
       </div>
 
       <div id="uploadSection" className="upload-section">
-        {uploadType === 'file' && (
+        {uploadType === 'file' ? (
           <>
             <div className="form-group">
               <label>File 1</label>
@@ -110,13 +125,64 @@ function App() {
               </span>
             </div>
           </>
+        ) : (
+          <>
+            <div className="form-group">
+              <label>Folder 1</label>
+              <input 
+                type="file" 
+                id="folder1" 
+                onChange={handleFileChange}
+                webkitdirectory="true"
+                directory="true"
+                disabled={loading} 
+                style={{ display: 'none' }}
+              />
+              <button 
+                onClick={() => document.getElementById('folder1').click()}
+                className="file-button"
+              >
+                Choose Folder
+              </button>
+              <span className="file-name">
+                {files.folder1.length > 0 
+                  ? `Selected ${files.folder1.length} files` 
+                  : ''}
+              </span>
+            </div>
+            <div className="form-group">
+              <label>Folder 2</label>
+              <input 
+                type="file" 
+                id="folder2" 
+                onChange={handleFileChange}
+                webkitdirectory="true"
+                directory="true"
+                disabled={loading}
+                style={{ display: 'none' }}
+              />
+              <button 
+                onClick={() => document.getElementById('folder2').click()}
+                className="file-button"
+              >
+                Choose Folder
+              </button>
+              <span className="file-name">
+                {files.folder2.length > 0 
+                  ? `Selected ${files.folder2.length} files` 
+                  : ''}
+              </span>
+            </div>
+          </>
         )}
       </div>
 
       <button 
         className="submit-btn" 
         onClick={handleSubmit}
-        disabled={loading || !files.file1 || !files.file2}
+        disabled={loading || 
+          (uploadType === 'file' && (!files.file1 || !files.file2)) ||
+          (uploadType === 'folder' && (files.folder1.length === 0 || files.folder2.length === 0))}
       >
         {loading ? 'Processing...' : 'Submit'}
       </button>
