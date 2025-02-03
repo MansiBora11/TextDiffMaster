@@ -130,41 +130,138 @@ public class FileDifferenceService {
             DiffMatchPatch dmp = new DiffMatchPatch();
             StringBuilder htmlOutput = new StringBuilder();
 
-            htmlOutput.append("<!DOCTYPE html><html><head><style>")
-                    .append("body { font-family: Arial, sans-serif; }")
-                    .append("table { border-collapse: collapse; width: 100%; margin-top: 20px; }")
+            // Generate HTML header
+            htmlOutput.append("<!DOCTYPE html>")
+                    .append("<html><head>")
+                    .append("<meta charset='UTF-8'>")
+                    .append("<style>")
+                    .append("body { font-family: Arial, sans-serif; margin: 20px; }")
+                    .append("table { border-collapse: collapse; width: 100%; }")
                     .append("th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }")
                     .append("th { background-color: #f2f2f2; }")
                     .append(".added { background-color: #b2f0b2; }")
                     .append(".deleted { background-color: #f0b2b2; }")
-                    .append("</style></head><body><h2>File Comparison</h2><table>")
-                    .append("<thead><tr><th>File 1</th><th>File 2</th></tr></thead><tbody>");
+                    .append("</style></head><body>")
+                    .append("<h2>Text File Comparison</h2>")
+                    .append("<table><thead>")
+                    .append("<tr><th>Original File</th><th>Modified File</th></tr>")
+                    .append("</thead><tbody>");
 
-            for (int i = 0; i < Math.max(lines1.size(), lines2.size()); i++) {
+            // Compare files line by line
+            int i = 0, j = 0;
+            while (i < lines1.size() || j < lines2.size()) {
                 String line1 = i < lines1.size() ? lines1.get(i) : "";
-                String line2 = i < lines2.size() ? lines2.get(i) : "";
+                String line2 = j < lines2.size() ? lines2.get(j) : "";
 
-                if (!line1.equals(line2)) {
-                    htmlOutput.append("<tr><td class='deleted'>").append(escapeHtml(line1))
-                            .append("</td><td class='added'>").append(escapeHtml(line2)).append("</td></tr>");
+                // Handle empty cases first
+                if (line1.isEmpty() && !line2.isEmpty()) {
+                    appendRow(htmlOutput, "&nbsp;",
+                            "<span class='added'>" + escapeHtml(line2) + "</span>");
+                    j++;
+                    continue;
+                }
+                if (!line1.isEmpty() && line2.isEmpty()) {
+                    appendRow(htmlOutput,
+                            "<span class='deleted'>" + escapeHtml(line1) + "</span>",
+                            "&nbsp;");
+                    i++;
+                    continue;
+                }
+
+                // Skip identical lines
+                if (line1.equals(line2)) {
+                    appendRow(htmlOutput, escapeHtml(line1), escapeHtml(line2));
+                    i++;
+                    j++;
+                    continue;
+
+
+                }
+
+                // Compare differing lines
+                if (isSimilarEnough(line1, line2)) {
+                    LinkedList<DiffMatchPatch.Diff> diffs = dmp.diffMain(line1, line2);
+                    dmp.diffCleanupSemantic(diffs);
+                    appendRow(htmlOutput,
+                            highlightDifferences(diffs, DiffMatchPatch.Operation.DELETE),
+                            highlightDifferences(diffs, DiffMatchPatch.Operation.INSERT));
+                    i++;
+                    j++;
                 } else {
-                    htmlOutput.append("<tr><td>").append(escapeHtml(line1)).append("</td><td>")
-                            .append(escapeHtml(line2)).append("</td></tr>");
+                    appendRow(htmlOutput,
+                            "<span class='deleted'>" + escapeHtml(line1) + "</span>",
+                            "<span class='added'>" + escapeHtml(line2) + "</span>");
+                    i++;
+                    j++;
                 }
             }
 
             htmlOutput.append("</tbody></table></body></html>");
 
-            File outputFile = new File("highlighted_diff.html");
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
+            // Create output file in system temp directory
+            String tempDir = System.getProperty("java.io.tmpdir");
+            String outputFileName = "text_diff_" + System.currentTimeMillis() + ".html";
+            String outputFilePath = tempDir + File.separator + outputFileName;
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
                 writer.write(htmlOutput.toString());
             }
 
-            return outputFile.getAbsolutePath();
+            return outputFilePath;
+        }
+
+        private static void appendRow(StringBuilder htmlOutput, String col1, String col2) {
+            htmlOutput.append("<tr>")
+                    .append("<td>").append(col1).append("</td>")
+                    .append("<td>").append(col2).append("</td>")
+                    .append("</tr>");
+        }
+
+        private static boolean isSimilarEnough(String str1, String str2) {
+            if (str1 == null || str2 == null) {
+                return false;
+            }
+
+            // Split strings into words and convert to lowercase for comparison
+            Set<String> words1 = new HashSet<>(Arrays.asList(str1.toLowerCase().split("\\s+")));
+            Set<String> words2 = new HashSet<>(Arrays.asList(str2.toLowerCase().split("\\s+")));
+
+            // Find the intersection of words
+            Set<String> intersection = new HashSet<>(words1);
+            intersection.retainAll(words2);
+
+            // Calculate similarity threshold (60% of the smaller set size)
+            int threshold = (int) Math.ceil(Math.min(words1.size(), words2.size()) * 0.6);
+
+            return intersection.size() >= threshold;
         }
 
         private static String escapeHtml(String text) {
-            return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+            if (text == null) {
+                return "";
+            }
+            return text.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;")
+                    .replace("'", "&#39;");
+        }
+
+        private static String highlightDifferences(LinkedList<DiffMatchPatch.Diff> diffs,
+                                                   DiffMatchPatch.Operation targetOperation) {
+            StringBuilder result = new StringBuilder();
+
+            for (DiffMatchPatch.Diff diff : diffs) {
+                if (diff.operation == targetOperation) {
+                    String cssClass = targetOperation == DiffMatchPatch.Operation.DELETE ? "deleted" : "added";
+                    result.append("<span class='").append(cssClass).append("'>")
+                            .append(escapeHtml(diff.text)).append("</span>");
+                } else if (diff.operation == DiffMatchPatch.Operation.EQUAL) {
+                    result.append(escapeHtml(diff.text));
+                }
+            }
+
+            return result.toString();
         }
     }
 }
