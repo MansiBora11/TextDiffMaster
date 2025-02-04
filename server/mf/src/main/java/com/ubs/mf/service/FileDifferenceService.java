@@ -153,6 +153,64 @@ public class FileDifferenceService {
                 String line1 = i < lines1.size() ? lines1.get(i) : "";
                 String line2 = j < lines2.size() ? lines2.get(j) : "";
 
+//                // Check for lines that exist only in file1
+//                if (i < lines1.size() && !lines1.get(i).trim().isEmpty()) {
+//                    boolean foundMatch = false;
+//                    // Look ahead in file2 to see if this line appears later
+//                    for (int k = j; k < lines2.size(); k++) {
+//                        if (isSimilarEnough(lines1.get(i), lines2.get(k))) {
+//                            foundMatch = true;
+//                            break;
+//                        }
+//                    }
+//
+//                    if (!foundMatch) {
+//                        // If no match found, this line exists only in file1
+//                        appendRow(htmlOutput, "<span class='deleted'>" + escapeHtml(line1) + "</span>", "&nbsp;");
+//                        i++;
+//                        continue;
+//                    }
+//                }
+//
+                // First check for lines that exist only in the file2
+                if (j < lines2.size() && !lines2.get(j).trim().isEmpty()) {
+                    boolean foundMatch = false;
+                    // Look ahead in file1 to see if this line appears later
+                    for (int k = i; k < lines1.size(); k++) {
+                        if (isSimilarEnough(lines1.get(k), lines2.get(j))) {
+                            foundMatch = true;
+                            break;
+                        }
+                    }
+
+                    if (!foundMatch) {
+                        // If no match found, this line exists only in file2
+                        appendRow(htmlOutput, "&nbsp;", "<span class='added'>" + escapeHtml(line2) + "</span>");
+                        j++;
+                        continue;
+                    }
+                }
+                // Check if current line in file2 has a better match earlier in file1
+                if (j < lines2.size()) {
+                    int bestMatchIndex = -1;
+                    for (int k = i; k < lines1.size(); k++) {
+                        if (isSimilarEnough(lines1.get(k), lines2.get(j))) {
+                            bestMatchIndex = k;
+                            break;
+                        }
+                    }
+
+                    if (bestMatchIndex != -1 && bestMatchIndex != i) {
+                        // Found a better match, so handle lines before that match as file1-only lines
+                        while (i < bestMatchIndex) {
+                            appendRow(htmlOutput, "<span class='deleted'>" + escapeHtml(lines1.get(i)) + "</span>", "&nbsp;");
+                            i++;
+                        }
+                        line1 = lines1.get(i);
+                    }
+                }
+
+
                 // Handle empty cases first
                 if (line1.isEmpty() && !line2.isEmpty()) {
                     appendRow(htmlOutput, "&nbsp;",
@@ -175,7 +233,6 @@ public class FileDifferenceService {
                     j++;
                     continue;
 
-
                 }
 
                 // Compare differing lines
@@ -187,13 +244,22 @@ public class FileDifferenceService {
                             highlightDifferences(diffs, DiffMatchPatch.Operation.INSERT));
                     i++;
                     j++;
-                } else {
+                }
+                else {
                     appendRow(htmlOutput,
                             "<span class='deleted'>" + escapeHtml(line1) + "</span>",
                             "<span class='added'>" + escapeHtml(line2) + "</span>");
                     i++;
                     j++;
                 }
+//                else {
+//                    // Lines are too different - show with empty cells
+//                    // If current lines aren't similar enough, move forward in file1
+//                    appendRow(htmlOutput,
+//                            "<span class='deleted'>" + escapeHtml(line1) + "</span>",
+//                            "&nbsp;");
+//                    i++;
+//                }
             }
 
             htmlOutput.append("</tbody></table></body></html>");
