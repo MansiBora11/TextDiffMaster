@@ -73,7 +73,8 @@ public class FileDifferenceService {
         }
 
         private static String compareExcelFiles(File file1, File file2) throws IOException {
-            File outputExcel = new File("highlighted_diff.xlsx");
+            File outputExcel = new File("output/" + file1.getName().replace("_old.xlsx", "_diff.xlsx"));
+            System.out.println("Saving Excel diff file to: " + outputExcel.getAbsolutePath());
 
             try (FileInputStream fis1 = new FileInputStream(file1);
                  FileInputStream fis2 = new FileInputStream(file2);
@@ -114,10 +115,13 @@ public class FileDifferenceService {
                         }
                     }
                 }
-
+                Files.createDirectories(outputExcel.toPath().getParent());
                 try (FileOutputStream fos = new FileOutputStream(outputExcel)) {
                     diffWorkbook.write(fos);
                 }
+            }
+            catch (Exception e) {
+                e.printStackTrace();
             }
 
             return outputExcel.getAbsolutePath();
