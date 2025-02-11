@@ -3,7 +3,6 @@ import axios from 'axios';
 const fileService = {
   compareFiles: async (formData) => {
     try {
-      // Make sure the URL matches your backend endpoint exactly
       const response = await axios.post('/api/compare', formData, {
         baseURL: 'http://localhost:8080', // Add your backend URL here
         headers: {
