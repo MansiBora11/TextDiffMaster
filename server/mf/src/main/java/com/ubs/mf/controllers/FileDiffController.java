@@ -102,7 +102,7 @@ public class FileDiffController {
                     Files.createDirectories(outputPath.getParent());
                     Files.move(outputFile.toPath(), outputPath, StandardCopyOption.REPLACE_EXISTING);
 
-                    String fileLink = "http://localhost:8080/downloads/" + outputFileName;
+                    String fileLink = "https://textdiffmaster.onrender.com/downloads/" + outputFileName;
                     diffFileLinks.add(fileLink);
                     System.out.println("Generated diff file: " + fileLink);
                 } else {
