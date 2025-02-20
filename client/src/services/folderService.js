@@ -27,7 +27,7 @@ class FolderService {
         this.folder2Files.forEach(file => formData.append("folder2Files", file));
     
         try {
-            const response = await fetch("http://localhost:8080/api/compareFolders", {
+            const response = await fetch(`https://textdiffmaster.onrender.com/api/compareFolders`, {
                 method: "POST",
                 body: formData
             });

@@ -4,7 +4,7 @@ const fileService = {
   compareFiles: async (formData) => {
     try {
       const response = await axios.post('/api/compare', formData, {
-        baseURL: 'http://localhost:8080', // Add your backend URL here
+        baseURL: 'https://textdiffmaster.onrender.com/', 
         headers: {
           // Don't set Content-Type, axios will set it automatically
         },

@@ -122,14 +122,7 @@ const handleSubmit = async () => {
   }
 };
 
-
-
-
-
-
-
-
-  return (
+return (
     <div className="container">
       <h1>File/Folder Comparison Tool</h1>
       
