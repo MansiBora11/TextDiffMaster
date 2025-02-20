@@ -5,8 +5,8 @@ FROM maven:3.6.3-openjdk-17 AS build
 WORKDIR /app
 
 # Copy pom.xml and source code
-COPY pom.xml /app/
-COPY src /app/src
+COPY ./server/mf/pom.xml /app/
+COPY ./server/mf/src /app/src
 
 # Build the application
 RUN mvn clean install -X
