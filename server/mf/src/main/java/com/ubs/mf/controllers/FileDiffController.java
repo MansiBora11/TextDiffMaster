@@ -30,8 +30,8 @@ public class FileDiffController {
                                                  @RequestParam("file2") MultipartFile file2) {
         try {
             // Save uploaded files locally
-            File tempFile1 = saveMultipartFile(file1);
-            File tempFile2 = saveMultipartFile(file2);
+            File tempFile1 = saveMultipartFile(file1, getFileExtension(file1.getOriginalFilename()));
+            File tempFile2 = saveMultipartFile(file2, getFileExtension(file2.getOriginalFilename()));
 
             // Perform comparison and generate output file
             File outputFile = highlightDifferences(tempFile1, tempFile2);
@@ -57,7 +57,6 @@ public class FileDiffController {
     public ResponseEntity<List<String>> compareFolders(
             @RequestParam("folder1Files") List<MultipartFile> folder1Files,
             @RequestParam("folder2Files") List<MultipartFile> folder2Files) {
-
         try {
             System.out.println("Received " + folder1Files.size() + " files in Folder 1:");
             for (MultipartFile file : folder1Files) {
@@ -86,21 +85,19 @@ public class FileDiffController {
                 if (folder2Map.containsKey(baseName)) {
                     File file1 = folder1Map.get(baseName);
                     File file2 = folder2Map.get(baseName);
-                    String fileType = getFileExtension(file1);
 
-                    System.out.println(" Comparing: " + file1.getName() + " with " + file2.getName());
-                    System.out.println(" Processing file type: " + fileType);
+                    System.out.println("Comparing: " + file1.getName() + " with " + file2.getName());
 
-                    // Call file comparison method
                     File outputFile = FileDifferenceService.FileDiffHighlighter.highlightDifferences(file1, file2);
 
                     if (outputFile == null || !outputFile.exists()) {
-                        System.out.println("Comparison failed for: " + baseName + fileType);
+                        System.out.println("Comparison failed for: " + baseName);
                         continue;
                     }
 
-                    // Save the output file
-                    String outputFileName = baseName + "_diff" + getFileExtension(outputFile);
+                    // Generate output with .html extension for non-spreadsheet files
+                    String fileType = getFileExtension(file1.getName());
+                    String outputFileName = baseName + (fileType.equals(".xlsx") || fileType.equals(".csv") ? "_diff" + fileType : "_diff.html");
                     Path outputPath = Paths.get("output/", outputFileName);
                     Files.createDirectories(outputPath.getParent());
                     Files.move(outputFile.toPath(), outputPath, StandardCopyOption.REPLACE_EXISTING);
@@ -118,65 +115,50 @@ public class FileDiffController {
             }
 
             return ResponseEntity.ok(diffFileLinks);
-
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body(Collections.singletonList("An error occurred during file comparison."));
         }
     }
 
-
     private Map<String, File> saveFiles(List<MultipartFile> files, String suffix) throws IOException {
         Map<String, File> fileMap = new HashMap<>();
         for (MultipartFile multipartFile : files) {
             String originalName = multipartFile.getOriginalFilename();
 
-            if (originalName != null && (originalName.endsWith(suffix + ".xlsx") ||
-                    originalName.endsWith(suffix + ".txt") ||
-                    originalName.endsWith(suffix + ".csv"))) {
-                // Remove path and keep only the filename
-                String baseName = Paths.get(originalName).getFileName().toString()
-                        .replace(suffix + ".xlsx", "")
-                        .replace(suffix + ".txt", "")
-                        .replace(suffix + ".csv", "");
+            if (originalName != null) {
+                String baseName = Paths.get(originalName).getFileName().toString().replace(suffix, "").replaceAll("\\..*", "");
+                String extension = getFileExtension(originalName);
 
-                File file = saveMultipartFile(multipartFile);
+                // Treat non-xlsx and non-csv files as txt
+                String tempSuffix = (extension.equals(".xlsx") || extension.equals(".csv")) ? extension : ".txt";
+
+                File file = saveMultipartFile(multipartFile, tempSuffix);
                 fileMap.put(baseName, file);
-                System.out.println(" Saved file: " + file.getAbsolutePath());
+                System.out.println("Saved file: " + file.getAbsolutePath());
             } else {
-                System.out.println(" Skipping file: " + originalName);
+                System.out.println("Skipping file: " + originalName);
             }
         }
         return fileMap;
     }
 
-
-
-    private File saveMultipartFile(MultipartFile multipartFile) throws IOException {
-        // Extract the original filename (excluding any folder structure)
-        String originalName = Paths.get(multipartFile.getOriginalFilename()).getFileName().toString();
-
-        if (originalName == null || originalName.isEmpty()) {
-            throw new IOException("Invalid file name.");
-        }
-
-        // Create a temp file safely
-        File file = File.createTempFile("upload_", "_" + originalName);
-
+    private File saveMultipartFile(MultipartFile multipartFile, String tempSuffix) throws IOException {
+        File file = File.createTempFile("upload_", tempSuffix);
         try (FileOutputStream fos = new FileOutputStream(file)) {
             fos.write(multipartFile.getBytes());
         }
-
-        System.out.println("Saved file: " + file.getAbsolutePath()); // Debugging log
+        System.out.println("Saved file as: " + file.getAbsolutePath());
         return file;
     }
 
-
-    private String getFileExtension(File file) {
-        String name = file.getName();
-        int lastIndex = name.lastIndexOf(".");
-        return (lastIndex > 0) ? name.substring(lastIndex) : "";
+    private String getFileExtension(String fileName) {
+        int lastIndex = fileName.lastIndexOf(".");
+        return (lastIndex > 0) ? fileName.substring(lastIndex) : "";
     }
+
+
+
 
 
 }
